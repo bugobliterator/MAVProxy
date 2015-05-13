@@ -32,18 +32,19 @@ class logger(mp_module.MPModule):
             print (self.download - self.prev_download)/((end - self.start)*1000), "Kb/s "
             self.start = time.time()
             self.prev_download = self.download
-        if 'REMOTE_LOG_DATA_BLOCK' in self.status.msgs and self.block_cnt == self.status.msgs['REMOTE_LOG_DATA_BLOCK'].block_cnt:
-            size = self.status.msgs['REMOTE_LOG_DATA_BLOCK'].block_size
-            #print ''.join(chr(e) for e in self.status.msgs['REMOTE_LOG_DATA_BLOCK'].data[:size]),
-            data = ''.join(chr(e) for e in self.status.msgs['REMOTE_LOG_DATA_BLOCK'].data[:size])
-            if(CRCCCITT().calculate(data) == self.status.msgs['REMOTE_LOG_DATA_BLOCK'].crc):
-                self.logfile.write(''.join(chr(e) for e in self.status.msgs['REMOTE_LOG_DATA_BLOCK'].data[:size]))
+
+    def mavlink_packet(self, m):
+        self.master.mav.remote_log_req_block_send(self.block_cnt)
+        if m.get_type() == 'REMOTE_LOG_DATA_BLOCK':
+            if self.block_cnt == m.block_cnt:
+                size = m.block_size
+                data = bytearray(m.data[:size])
+                self.logfile.write(data)
+                self.logfile.flush()
                 self.download+=size
                 self.block_cnt+=1
                 #print self.status.msgs['REMOTE_LOG_DATA_BLOCK']
-
-        self.master.mav.remote_log_req_block_send(self.block_cnt)
-
+            
 def init(mpstate):
     '''initialise module'''
     return logger(mpstate)
