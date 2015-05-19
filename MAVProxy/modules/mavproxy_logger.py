@@ -18,7 +18,11 @@ class logger(mp_module.MPModule):
         super(logger, self).__init__(mpstate, "logger", "log")
         print "Logging Started!!"
         self.block_cnt = 1
-        self.logfile = open('/Users/Siddharth/Documents/Programming/MAVProxy/magMAVproxy/MAVProxy/modules/log.bin', 'wb')
+	filename = '/log/dataflash/log.bin'
+	dir = os.path.dirname(filename)
+	if not os.path.exists(dir):
+    		os.makedirs(dir)
+        self.logfile = open(filename, 'w+b')
         self.logfile.truncate()
         self.prev_cnt = 0
         self.download = 0
