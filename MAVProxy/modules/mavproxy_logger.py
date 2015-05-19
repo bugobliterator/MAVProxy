@@ -9,7 +9,6 @@ from pymavlink import mavutil
 from time import sleep
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
-from PyCRC.CRCCCITT import CRCCCITT
 import time
 
 
