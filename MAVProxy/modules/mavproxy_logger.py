@@ -16,34 +16,46 @@ class logger(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module."""
         super(logger, self).__init__(mpstate, "logger", "log")
-        print "Logging Started!!"
         self.block_cnt = 1
-	filename = '/log/dataflash/log.bin'
-	dir = os.path.dirname(filename)
-	if not os.path.exists(dir):
-    		os.makedirs(dir)
-        self.logfile = open(filename, 'w+b')
+      	filename = '/log/dataflash/log.bin'
+        dir = os.path.dirname(filename)
+        if not os.path.exists(dir):
+            while True:
+                try:
+                    os.makedirs(dir)
+                except:
+                    continue
+                break
+        while True:
+            try:
+                self.logfile = open(filename, 'w+b')
+            except:
+                continue
+            break
         self.logfile.truncate()
+        print "Logging Started!!"
         self.prev_cnt = 0
         self.download = 0
         self.prev_download = 0
         self.start = time.time()
         self.missing_blocks = []
         self.new_log_started = False
+        self.max_block_cnt = 0
 
     def idle_task(self):
         end = time.time()
         if self.new_log_started == False :
             self.master.mav.remote_log_block_status_send(0,1)
+            sleep(1)
         else:
             self.master.mav.remote_log_block_status_send(self.block_cnt,1)
         if (end - self.start) >= 10:
-            print "Log Download Rate:  ",(self.download - self.prev_download)/((end - self.start)*1000), "Kb/s "
+            print "\nLog Download Rate:  ",(self.download - self.prev_download)/((end - self.start)*1000), "Kb/s "
             self.start = time.time()
             self.prev_download = self.download
-        for missed_block in missing_blocks:
-            print "Requesting Missed Block!!"
-            self.master.mav.remote_log_block_status_send(self.block_cnt,0)
+        for missed_block in self.missing_blocks:
+            print "\nRequesting Missed Block!!", self.missing_blocks
+            self.master.mav.remote_log_block_status_send(missed_block,0)
 
     def mavlink_packet(self, m):
         if m.get_type() == 'REMOTE_LOG_DATA_BLOCK':
@@ -55,16 +67,21 @@ class logger(mp_module.MPModule):
                 ofs = size*(m.block_cnt - 1)
                 self.logfile.seek(ofs)
                 self.logfile.write(data)
-                self.logfile.flush()
-                if(m.block_cnt - self.block_cnt > 1): 
-                    for blocks in range(self.block_cnt+1, m.block_cnt):
-                        self.missing_blocks.append(blocks)
-                    print "missed blocks: ",self.missing_blocks
-                elif(m.block_cnt - self.block_cnt < 1):
-                    self.missed_blocks.remove(m.block_cnt)
-                self.download+=size
-                self.block_cnt=m.block_cnt
 
+                if m.block_cnt in self.missing_blocks:
+                    print "\nremoved block: ",m.block_cnt
+                    print "\nmissed blocks: ",self.missing_blocks
+                    self.missing_blocks.remove(m.block_cnt)
+                    print "\nmissed blocks: ",self.missing_blocks
+                else:
+                    if(m.block_cnt - self.max_block_cnt > 1): 
+                        for blocks in range(self.block_cnt+1, m.block_cnt):
+                            if blocks not in self.missing_blocks:
+                                self.missing_blocks.append(blocks)
+                        #print "\nmissed blocks: ",self.missing_blocks
+                    self.max_block_cnt=m.block_cnt
+                self.block_cnt = m.block_cnt
+                self.download+=size
 def init(mpstate):
     '''initialise module'''
     return logger(mpstate)
