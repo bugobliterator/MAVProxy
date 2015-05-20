@@ -56,9 +56,10 @@ class logger(mp_module.MPModule):
                 self.logfile.seek(ofs)
                 self.logfile.write(data)
                 self.logfile.flush()
-                if(m.block_cnt - self.block_cnt > 1): #missed blocks
+                if(m.block_cnt - self.block_cnt > 1): 
                     for blocks in range(self.block_cnt+1, m.block_cnt):
                         self.missing_blocks.append(blocks)
+                    print "missed blocks: ",self.missing_blocks
                 elif(m.block_cnt - self.block_cnt < 1):
                     self.missed_blocks.remove(m.block_cnt)
                 self.download+=size
