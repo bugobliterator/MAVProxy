@@ -17,8 +17,8 @@ class logger(mp_module.MPModule):
         """Initialise module."""
         super(logger, self).__init__(mpstate, "logger", "log")
         self.block_cnt = 1
-      	filename = '/log/dataflash/log.bin'
-        dir = os.path.dirname(filename)
+        lastlog_filename = '/log/dataflash/LASTLOG.TXT'
+        dir = os.path.dirname(lastlog_filename)
         if not os.path.exists(dir):
             while True:
                 try:
@@ -26,6 +26,26 @@ class logger(mp_module.MPModule):
                 except:
                     continue
                 break
+        if os.path.isfile(lastlog_filename) is False:
+            self.lastlog_file = open(lastlog_filename,'w+b')
+
+        if os.stat(lastlog_filename).st_size == 0:
+            log_cnt = 1
+            self.lastlog_file.write(log_cnt.__str__())
+            self.lastlog_file.close()
+
+        else:
+            self.lastlog_file = open(lastlog_filename,'rb')
+            log_cnt = int(self.lastlog_file.read()) + 1
+            self.lastlog_file.close()
+            self.lastlog_file = open(lastlog_filename,'wb')
+            self.lastlog_file.truncate()
+            self.lastlog_file.write(log_cnt.__str__())
+            self.lastlog_file.close()
+
+        filename = '/log/dataflash/log' + log_cnt.__str__() + '.bin'
+
+
         while True:
             try:
                 self.logfile = open(filename, 'w+b')
