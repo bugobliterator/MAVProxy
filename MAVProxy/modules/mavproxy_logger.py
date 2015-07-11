@@ -25,6 +25,8 @@ class logger(mp_module.MPModule):
 
         self.log_settings = mp_settings.MPSettings(
             [ ('verbose', bool, False),
+              ('target_system', int, None),
+              ('target_component', int, None)
           ])
         self.add_command('logger', self.cmd_logger, "dataflash logging control", ['start','stop','set (LOGSETTING)'])
         self.add_completion_function('(LOGSETTING)', self.log_settings.completion)
@@ -113,6 +115,16 @@ class logger(mp_module.MPModule):
             self.start = now
             self.prev_download = self.download
 
+    def target_system(self):
+        if self.log_settings.target_system is not None:
+            return self.log_settings.target_system
+        return 0
+
+    def target_component(self):
+        if self.log_settings.target_component is not None:
+            return self.log_settings.target_component
+        return 0
+
     def idle_send_acks_and_nacks(self):
         max_blocks_to_send = 10
         blocks_sent = 0
@@ -125,7 +137,10 @@ class logger(mp_module.MPModule):
             [master, block, status, first_sent, last_sent] = stuff
             if status == 1:
 #                print("DFLogger: ACKing block (%d)" % (block,))
-                self.master.mav.remote_log_block_status_send(block,status)
+                self.master.mav.remote_log_block_status_send(self.target_system(),
+                                                             self.target_component(),
+                                                             block,
+                                                             status)
                 blocks_sent += 1
                 self.acking_blocks.discard(block)
                 del self.blocks_to_ack_and_nack[i]
@@ -154,12 +169,14 @@ class logger(mp_module.MPModule):
 
             if self.log_settings.verbose:
                 print("DFLogger: NACKing block (%d)" % (block,))
-            self.master.mav.remote_log_block_status_send(block,status)
+            self.master.mav.remote_log_block_status_send(self.target_system(),
+                                                         self.target_component(),
+                                                         block,
+                                                         status)
             blocks_sent += 1
             stuff[4] = now
 
     def idle_task_started(self):
-        max_blocks = 5 # limit the number of blocks we process in any idle loop
         if self.log_settings.verbose:
             self.idle_print_download_rate()
         self.idle_send_acks_and_nacks()
@@ -168,15 +185,40 @@ class logger(mp_module.MPModule):
         if self.new_log_started == True:
             self.idle_task_started()
 
+    def tell_sender_to_stop(self):
+        # send a stop packet every second until the other end gets the idea:
+        now = time.time()
+        if now - self.time_last_stop_packet_sent < 1:
+            return
+        if self.log_settings.verbose:
+            print("DFLogger: Sending stop packet")
+        self.time_last_stop_packet_sent = now
+        self.master.mav.remote_log_block_status_send(self.target_system(),
+                                                     self.target_component(),
+                                                     4294967294,
+                                                     1)
+    def tell_sender_to_start(self):
+        now = time.time()
+        if now - self.time_last_start_packet_sent < 1:
+            return
+        if self.log_settings.verbose:
+            print("DFLogger: Sending start packet (%d)/(%d)", now, self.time_last_start_packet_sent)
+        self.time_last_start_packet_sent = now
+
+        self.master.mav.remote_log_block_status_send(self.target_system(),
+                                                     self.target_component(),
+                                                     4294967295,
+                                                     1)
+
     def mavlink_packet(self, m):
         now = time.time()
         if m.get_type() == 'REMOTE_LOG_DATA_BLOCK':
+            if m.target_system != self.master.mav.srcSystem:
+                return
+            if m.target_component != self.master.mav.srcComponent:
+                return
             if self.stopped:
-                # send a stop packet every second until the other end gets the idea:
-                if now - self.time_last_stop_packet_sent > 1:
-                    if self.log_settings.verbose:
-                        print("DFLogger: Sending stop packet")
-                    self.master.mav.remote_log_block_status_send(4294967294,1)
+                self.tell_sender_stop()
                 return
 
 #            if random.random() < 0.1: # drop 1 packet in 10
@@ -228,11 +270,7 @@ class logger(mp_module.MPModule):
                 self.download += size
         elif not self.new_log_started and not self.stopped:
             # send a start packet every second until the other end gets the idea:
-            if now - self.time_last_start_packet_sent > 1:
-                if self.log_settings.verbose:
-                    print("DFLogger: Sending start packet")
-                self.master.mav.remote_log_block_status_send(4294967295,1)
-                self.time_last_start_packet_sent = now
+            self.tell_sender_to_start()
 
 def init(mpstate):
     '''initialise module'''
