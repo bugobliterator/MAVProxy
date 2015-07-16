@@ -217,8 +217,6 @@ class logger(mp_module.MPModule):
         if m.get_type() == 'REMOTE_LOG_DATA_BLOCK':
             if m.target_system != self.master.mav.srcSystem:
                 return
-            if m.target_component != self.master.mav.srcComponent:
-                return
             if self.stopped:
                 self.tell_sender_stop()
                 return
