@@ -22,11 +22,13 @@ class logger(mp_module.MPModule):
         self.time_last_start_packet_sent = 0
         self.time_last_stop_packet_sent = 0
         self.dataflash_dir = self._dataflash_dir(mpstate)
+        autopilot_system = 1
+        autopilot_component = 1
 
         self.log_settings = mp_settings.MPSettings(
             [ ('verbose', bool, False),
-              ('target_system', int, None),
-              ('target_component', int, None)
+              ('target_system', int, autopilot_system),
+              ('target_component', int, autopilot_component)
           ])
         self.add_command('logger', self.cmd_logger, "dataflash logging control", ['start','stop','set (LOGSETTING)'])
         self.add_completion_function('(LOGSETTING)', self.log_settings.completion)
