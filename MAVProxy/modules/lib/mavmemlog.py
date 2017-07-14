@@ -79,6 +79,12 @@ class mavmemlog(mavutil.mavfile):
         '''return list of all flightmodes as tuple of mode and start time'''
         return self._flightmodes
 
+    def set_pct(self,pct):
+        self._index = int(pct*self._count/100.0)
+
+    def get_pct(self):
+        return self.percent
+
     def reduce_by_flightmodes(self, flightmode_selections):
         '''reduce data using flightmode selections'''
         if len(flightmode_selections) == 0:
